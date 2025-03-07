@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Page configuration
 st.set_page_config(
-    page_title="App Usage Analytics",
+    page_title="Xpertus Analytics",
     page_icon="📱",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -82,7 +82,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("# App Usage Analytics 📱")
+st.markdown("# Xpertus Usage Analytics 📱")
 st.sidebar.markdown("# Analytics 📱")
 
 ## set up db
@@ -112,23 +112,22 @@ def generate_mock_data():
     # Create user IDs
     user_ids = [f"user_{i}" for i in range(1, 101)]
     
-    # Create events
-    events = ["Launch", "Search", "View", "Purchase", "Logout", "Error", "Settings"]
+    # Create events for travel agency Instagram bot
+    events = ["Conversation_Start", "Destination_Query", "Price_Query", "Booking_Request", 
+              "Booking_Confirmed", "Itinerary_Request", "Support_Query", "Feedback"]
     
-    # Create flavors
-    flavors = ["iOS", "Android", "Web"]
+    # Create flavors (keep original column name for compatibility)
+    flavors = ["Instagram", "Website", "Mobile_App"]
     
-    # Create OS versions
-    os_types = ["iOS", "Android"]
-    ios_versions = ["15", "16", "17"]
-    android_versions = ["11", "12", "13"]
+    # Create OS versions (repurposed for user demographics)
+    age_groups = ["18-24", "25-34", "35-44", "45-54", "55+"]
     
-    # Create app versions
-    app_versions = ["1.0.0", "1.1.0", "1.2.0", "2.0.0"]
+    # Create app versions (repurposed for trip types)
+    trip_types = ["Beach", "City", "Adventure", "Cultural", "Luxury", "Budget", "Family"]
     
-    # Create device models
-    ios_models = ["iPhone 13", "iPhone 14", "iPhone 15", "iPad Pro", "iPad Air"]
-    android_models = ["Samsung Galaxy S22", "Google Pixel 7", "OnePlus 10", "Samsung Tab S8"]
+    # Create device models (repurposed for destinations)
+    destinations = ["Paris", "Bali", "New York", "Tokyo", "Cancun", "London", 
+                   "Barcelona", "Dubai", "Rome", "Maldives", "Sydney"]
     
     # Generate random data
     rows = []
@@ -136,22 +135,26 @@ def generate_mock_data():
         date = np.random.choice(dates)
         user_id = np.random.choice(user_ids)
         event = np.random.choice(events)
-        flavor = np.random.choice(flavors)
+        flavor = np.random.choice(flavors, p=[0.7, 0.2, 0.1])  # Instagram is more common
         
-        if flavor == "iOS":
-            os = "iOS"
-            os_version = np.random.choice(ios_versions)
-            model = np.random.choice(ios_models)
-        elif flavor == "Android":
-            os = "Android"
-            os_version = np.random.choice(android_versions)
-            model = np.random.choice(android_models)
+        # Repurpose OS and OSVersion for user demographics
+        os = "Instagram Bot"
+        os_version = np.random.choice(age_groups)
+        
+        # Repurpose clientVersion for trip types
+        client_version = np.random.choice(trip_types)
+        
+        # Repurpose model for destinations
+        if event in ["Destination_Query", "Price_Query", "Booking_Request", "Booking_Confirmed"]:
+            model = np.random.choice(destinations)
         else:
-            os = "Web"
-            os_version = "N/A"
-            model = "Browser"
+            model = "Unspecified"
         
-        client_version = np.random.choice(app_versions)
+        # Add booking value as a custom field
+        if event == "Booking_Confirmed":
+            booking_value = int(np.random.normal(1500, 500))
+        else:
+            booking_value = 0
         
         rows.append({
             "clientDate": date,
@@ -161,21 +164,28 @@ def generate_mock_data():
             "OS": os,
             "OSVersion": os_version,
             "clientVersion": client_version,
-            "model": model
+            "model": model,
+            "booking_value": booking_value
         })
     
     # Create DataFrame
     df = pd.DataFrame(rows)
     
     # Add some trends to make the data more realistic
-    # More iOS 17 users in recent days
-    recent_mask = df["clientDate"] > (end_date - datetime.timedelta(days=30))
-    ios_mask = df["OS"] == "iOS"
-    df.loc[recent_mask & ios_mask, "OSVersion"] = np.random.choice(["16", "17"], size=sum(recent_mask & ios_mask), p=[0.3, 0.7])
-    
-    # More launches on weekends
+    # More bookings on weekends
     weekend_mask = df["clientDate"].dt.dayofweek >= 5  # Saturday and Sunday
-    df.loc[weekend_mask, "event"] = np.random.choice(events, size=sum(weekend_mask), p=[0.4, 0.1, 0.2, 0.1, 0.1, 0.05, 0.05])
+    df.loc[weekend_mask, "event"] = np.random.choice(
+        events, 
+        size=sum(weekend_mask), 
+        p=[0.15, 0.15, 0.15, 0.2, 0.15, 0.1, 0.05, 0.05]
+    )
+    
+    # More beach destinations in summer months (assuming Northern Hemisphere)
+    summer_mask = (df["clientDate"].dt.month >= 6) & (df["clientDate"].dt.month <= 8)
+    beach_destinations = ["Bali", "Cancun", "Maldives"]
+    summer_dest_mask = summer_mask & df["model"].isin(beach_destinations)
+    if sum(summer_dest_mask) > 0:
+        df.loc[summer_dest_mask, "booking_value"] = df.loc[summer_dest_mask, "booking_value"] * 1.2
     
     logger.info(f"Generated mock data with shape: {df.shape}")
     return df
@@ -262,126 +272,128 @@ with col[0]:
     # Total users
     total_users = filtered_data["userClientId"].nunique()
     
-    # Total sessions
-    total_sessions = filtered_data[filtered_data["event"] == "Launch"].shape[0]
+    # Total conversations
+    total_conversations = filtered_data[filtered_data["event"] == "Conversation_Start"].shape[0]
     
-    # Active users last 7 days (if within date range)
-    seven_days_ago = max_date - datetime.timedelta(days=7)
-    if seven_days_ago >= start_date:
-        last_week_data = filtered_data[filtered_data["clientDate"].dt.date >= seven_days_ago]
-        active_users_val = last_week_data["userClientId"].nunique()
-    else:
-        active_users_val = "N/A"
+    # Total bookings
+    total_bookings = filtered_data[filtered_data["event"] == "Booking_Confirmed"].shape[0]
     
     # Display metrics
     st.metric("Total Users", total_users)
-    st.metric("Total Sessions", total_sessions)
-    st.metric("Active Users (Last 7 Days)", active_users_val)
+    st.metric("Total Conversations", total_conversations)
+    st.metric("Total Bookings", total_bookings)
 
-# Middle column - iOS Version chart
+# Middle column - Destination Trends chart (replacing iOS Version chart)
 with col[1]:
-    st.markdown('#### iOS Version Usage Over Time')
+    st.markdown('#### Destination Trends Over Time')
     
-    # Process iOS version data
-    if not filtered_data.empty and "OS" in filtered_data.columns:
-        ios_data = filtered_data[filtered_data["OS"] == "iOS"].copy()
-        ios_data["date"] = ios_data["clientDate"].dt.strftime('%Y-%m-%d')
-        ios_data["major_version"] = ios_data["OSVersion"].str.split('.').str[0]
+    # Process destination data (using model field)
+    if not filtered_data.empty and "model" in filtered_data.columns:
+        # Filter for rows with actual destinations (not "Unspecified")
+        dest_data = filtered_data[filtered_data["model"] != "Unspecified"].copy()
+        dest_data["date"] = dest_data["clientDate"].dt.strftime('%Y-%m-%d')
         
-        # Group by date and major version
-        ios_version_data = ios_data.groupby(["date", "major_version"]).size().reset_index(name="count")
+        # Get top 5 destinations
+        top_destinations = dest_data["model"].value_counts().nlargest(5).index.tolist()
+        dest_data = dest_data[dest_data["model"].isin(top_destinations)]
         
-        if not ios_version_data.empty:
+        # Group by date and destination
+        dest_trend_data = dest_data.groupby(["date", "model"]).size().reset_index(name="count")
+        
+        if not dest_trend_data.empty:
             # Convert date to datetime for proper sorting and rolling average
-            ios_version_data['date'] = pd.to_datetime(ios_version_data['date'])
+            dest_trend_data['date'] = pd.to_datetime(dest_trend_data['date'])
             
             # Create a pivot table for easier rolling average calculation
-            pivot_data = ios_version_data.pivot(index='date', columns='major_version', values='count').fillna(0)
+            pivot_data = dest_trend_data.pivot(index='date', columns='model', values='count').fillna(0)
             
-            # Apply 5-day rolling average instead of 3-day
+            # Apply 5-day rolling average
             smoothed_data = pivot_data.rolling(window=5, min_periods=1).mean()
             
             # Convert back to long format for plotting
-            smoothed_data = smoothed_data.reset_index().melt(id_vars='date', var_name='major_version', value_name='count')
+            smoothed_data = smoothed_data.reset_index().melt(id_vars='date', var_name='destination', value_name='count')
             
             # Create line chart with smoothing
             fig = px.line(
                 smoothed_data, 
                 x='date', 
                 y='count', 
-                color='major_version',
-                title='iOS Version Usage Over Time (5-Day Average)',
-                labels={'count': 'Number of Sessions', 'date': 'Date', 'major_version': 'iOS Version'}
+                color='destination',
+                title='Destination Trends Over Time (5-Day Average)',
+                labels={'count': 'Number of Queries/Bookings', 'date': 'Date', 'destination': 'Destination'}
             )
             fig.update_traces(line_shape='linear')
             fig.update_layout(
                 template='plotly_dark',
                 plot_bgcolor='rgba(0, 0, 0, 0)',
                 paper_bgcolor='rgba(0, 0, 0, 0)',
-                legend_title_text='iOS Version'
+                legend_title_text='Destination'
             )
             st.plotly_chart(fig, use_container_width=True)
     else:
-        st.write("No iOS data available for the selected filters.")
+        st.write("No destination data available for the selected filters.")
 
 # Right column - Top data
 with col[2]:
-    st.markdown('#### Top Device Models')
+    st.markdown('#### Top Destinations')
     
-    # Get device models data from filtered data
+    # Get destinations data from filtered data (using model field)
     try:
         if 'model' in filtered_data.columns:
-            models_data = filtered_data.groupby('model').size().reset_index(name='count')
-            models_data = models_data.sort_values('count', ascending=False).head(10)
+            # Filter out "Unspecified" destinations
+            dest_data = filtered_data[filtered_data['model'] != "Unspecified"]
+            destinations_data = dest_data.groupby('model').size().reset_index(name='count')
+            destinations_data = destinations_data.sort_values('count', ascending=False).head(10)
             
-            if not models_data.empty:
+            if not destinations_data.empty:
                 st.dataframe(
-                    models_data,
+                    destinations_data,
                     column_order=("model", "count"),
                     hide_index=True,
                     width=None,
                     column_config={
-                        "model": st.column_config.TextColumn("Device Model"),
+                        "model": st.column_config.TextColumn("Destination"),
                         "count": st.column_config.ProgressColumn(
                             "Count",
                             format="%d",
                             min_value=0,
-                            max_value=int(models_data["count"].max()) if not models_data.empty else 0,
+                            max_value=int(destinations_data["count"].max()) if not destinations_data.empty else 0,
                         )
                     }
                 )
             else:
-                st.info("No device model data available for the selected filters.")
+                st.info("No destination data available for the selected filters.")
         else:
-            st.info("Model data not available in the dataset.")
+            st.info("Destination data not available in the dataset.")
     except Exception as e:
-        logger.error(f"Error displaying device models: {e}")
-        st.error(f"Error displaying device models: {e}")
+        logger.error(f"Error displaying destinations: {e}")
+        st.error(f"Error displaying destinations: {e}")
 
-# Create a new row for Daily Active Users that spans columns 1 and 2
+# Create a new row for Daily Booking Revenue
 daily_users_col = st.columns([6, 2])
 
 with daily_users_col[0]:
-    st.markdown('#### Daily Active Users')
+    st.markdown('#### Daily Booking Revenue')
     
-    # Process daily active users data
-    daily_users_data = filtered_data.groupby(filtered_data['clientDate'].dt.strftime('%Y-%m-%d'))['userClientId'].nunique().reset_index()
-    daily_users_data.columns = ['date', 'daily_users']
-    daily_users_data['date'] = pd.to_datetime(daily_users_data['date'])
-    
-    if not daily_users_data.empty:
-        # Sort by date to ensure proper rolling average
-        daily_users_data = daily_users_data.sort_values('date')
+    # Process daily booking revenue data
+    booking_data = filtered_data[filtered_data['event'] == 'Booking_Confirmed'].copy()
+    if not booking_data.empty:
+        daily_revenue = booking_data.groupby(booking_data['clientDate'].dt.strftime('%Y-%m-%d'))['booking_value'].sum().reset_index()
+        daily_revenue.columns = ['date', 'revenue']
+        daily_revenue['date'] = pd.to_datetime(daily_revenue['date'])
         
-        # Apply 5-day rolling average instead of 3-day
-        daily_users_data['daily_users_smooth'] = daily_users_data['daily_users'].rolling(window=5, min_periods=1).mean()
+        # Sort by date to ensure proper rolling average
+        daily_revenue = daily_revenue.sort_values('date')
+        
+        # Apply 5-day rolling average
+        daily_revenue['revenue_smooth'] = daily_revenue['revenue'].rolling(window=5, min_periods=1).mean()
         
         fig = px.line(
-            daily_users_data, 
+            daily_revenue, 
             x='date', 
-            y='daily_users_smooth',
-            title='Daily Active Users (5-Day Average)',
-            labels={'daily_users_smooth': 'Active Users', 'date': 'Date'}
+            y='revenue_smooth',
+            title='Daily Booking Revenue (5-Day Average)',
+            labels={'revenue_smooth': 'Revenue ($)', 'date': 'Date'}
         )
         fig.update_traces(line_shape='linear')
         fig.update_layout(
@@ -390,27 +402,29 @@ with daily_users_col[0]:
             paper_bgcolor='rgba(0, 0, 0, 0)'
         )
         st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No booking data available for the selected filters.")
 
 with daily_users_col[1]:
-    st.markdown('#### Top App Versions')
+    st.markdown('#### Top Trip Types')
     
-    # Process app versions data
-    versions_data = filtered_data.groupby('clientVersion').size().reset_index(name='count')
-    versions_data = versions_data.sort_values('count', ascending=False).head(10)
+    # Process trip types data (using clientVersion field)
+    trip_types_data = filtered_data.groupby('clientVersion').size().reset_index(name='count')
+    trip_types_data = trip_types_data.sort_values('count', ascending=False).head(10)
     
-    if not versions_data.empty:
+    if not trip_types_data.empty:
         st.dataframe(
-            versions_data,
+            trip_types_data,
             column_order=("clientVersion", "count"),
             hide_index=True,
             width=None,
             column_config={
-                "clientVersion": st.column_config.TextColumn("App Version"),
+                "clientVersion": st.column_config.TextColumn("Trip Type"),
                 "count": st.column_config.ProgressColumn(
                     "Count",
                     format="%d",
                     min_value=0,
-                    max_value=int(versions_data["count"].max()),
+                    max_value=int(trip_types_data["count"].max()),
                 )
             }
         )
@@ -488,23 +502,25 @@ def generate_openai_response(prompt, data):
         Current analytics data context:
         - Date range: {start_date} to {end_date}
         - Total users: {total_users}
-        - Total sessions: {total_sessions}
-        - Active users in last 7 days: {active_users_val}
+        - Total conversations: {total_conversations}
+        - Total bookings: {total_bookings}
         
-        Top device models: {', '.join([f"{model}: {count}" for model, count in filtered_data['model'].value_counts().head(5).items()])}
+        Top destinations: {', '.join([f"{dest}: {count}" for dest, count in filtered_data[filtered_data['model'] != 'Unspecified']['model'].value_counts().head(5).items()])}
         
-        Top app versions: {', '.join([f"{version}: {count}" for version, count in filtered_data['clientVersion'].value_counts().head(5).items()])}
+        Top trip types: {', '.join([f"{trip}: {count}" for trip, count in filtered_data['clientVersion'].value_counts().head(5).items()])}
         
         Event distribution: {', '.join([f"{event}: {count}" for event, count in filtered_data['event'].value_counts().items()])}
         
-        iOS version distribution: {', '.join([f"iOS {version}: {count}" for version, count in filtered_data[filtered_data['OS'] == 'iOS']['OSVersion'].value_counts().items()])}
+        User age groups: {', '.join([f"{age}: {count}" for age, count in filtered_data['OSVersion'].value_counts().items()])}
+        
+        Total booking revenue: ${filtered_data[filtered_data['event'] == 'Booking_Confirmed']['booking_value'].sum()}
         """
         
         # Call the OpenAI API
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",  # You can use "gpt-4" for better results if you have access
             messages=[
-                {"role": "system", "content": f"You are a helpful analytics assistant that answers questions about app usage data. Use only the following context to answer questions. If you can't answer based on this context, say so. {data_context}"},
+                {"role": "system", "content": f"You are a helpful travel analytics assistant that answers questions about a travel agency's Instagram bot data. Use only the following context to answer questions. If you can't answer based on this context, say so. {data_context}"},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=500,
@@ -557,10 +573,11 @@ about_col = st.columns([6, 2])
 with about_col[0]:
     with st.expander('About', expanded=True):
         st.write('''
-            - This dashboard shows analytics for your app usage.
-            - Filter by date range and app flavor using the sidebar.
-            - The iOS Version chart shows trends in iOS version usage over time.
-            - Daily Active Users shows user engagement patterns.
-            - Top Device Models and App Versions show the most common configurations.
+            - This dashboard shows analytics for your travel agency's Instagram AI bot.
+            - Filter by date range and platform using the sidebar.
+            - The Destination Trends chart shows trends in destination interest over time.
+            - Daily Booking Revenue shows revenue patterns from confirmed bookings.
+            - Top Destinations and Trip Types show the most popular travel choices.
+            - Event Distribution shows how users interact with your Instagram bot.
             - Use the chat interface to ask questions about the data.
             ''')
