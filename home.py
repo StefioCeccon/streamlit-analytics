@@ -19,15 +19,8 @@ st.image("static/image.png")
 # port = os.environ.get("POSTGRES_PORT")
 # database = os.environ.get("POSTGRES_DATABASE")
 
-username = 'doadmin'
-password = 'eifut7zbwv9a5akc'
-host = 'db-postgresql-skipq-logger-1-do-user-8711821-0.b.db.ondigitalocean.com'
-port = '25060'
-database = 'defaultdb'
 
-
-# Create connection string
-connection_string = f"postgresql://{username}:{password}@{host}:{port}/{database}"
+connection_string="postgresql://default:7RlpuXZI3EkB@ep-rapid-wave-a4lvky0c-pooler.us-east-1.aws.neon.tech:5432/verceldb?sslmode=require"
 
 # Create database connection
 @st.cache_resource

@@ -82,8 +82,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("# Xpertus Usage Analytics 📱")
-st.sidebar.markdown("# Analytics 📱")
+# st.markdown("# Xpertus Usage Analytics 📱")
+# st.sidebar.markdown("# 📊 Analytics Dashboard")
+# st.sidebar.markdown("---")
 
 ## set up db
 
