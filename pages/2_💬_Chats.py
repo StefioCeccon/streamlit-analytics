@@ -100,10 +100,20 @@ agency_mapping = dict(zip(agencies_df['id'], agencies_df['agency_name']))
 user_mapping = dict(zip(users_df['provider_user_id'], 
                        users_df.apply(lambda x: f"{x['name']} ({x['username']})", axis=1)))
 
+# Initialize session state if not exists
+if 'show_all_messages' not in st.session_state:
+    st.session_state.show_all_messages = False
+
+# Callback function to update session state
+def toggle_callback():
+    st.session_state.show_all_messages = not st.session_state.show_all_messages
+
 # Create a select box for agencies with friendly names
 unique_agencies = df['agency_id'].unique()
-agency_options = {agency_mapping.get(agency_id, f"Agency {agency_id}"): agency_id 
-                 for agency_id in unique_agencies}
+agency_options = {
+    f"{agency_mapping.get(agency_id, f'Agency {agency_id}')} {'(ID: ' + str(agency_id) + ')' if st.session_state.show_all_messages else ''}": agency_id 
+    for agency_id in unique_agencies
+}
 selected_agency_name = st.selectbox('Select Agency', list(agency_options.keys()))
 selected_agency = agency_options[selected_agency_name]
 
@@ -112,8 +122,10 @@ agency_data = df[df['agency_id'] == selected_agency]
 
 # Create a select box for senders with friendly names
 unique_senders = agency_data['provider_sender_id'].unique()
-sender_options = {user_mapping.get(sender_id, f"User {sender_id}"): sender_id 
-                 for sender_id in unique_senders}
+sender_options = {
+    f"{user_mapping.get(sender_id, f'User {sender_id}')} {'(ID: ' + str(sender_id) + ')' if st.session_state.show_all_messages else ''}": sender_id 
+    for sender_id in unique_senders
+}
 selected_sender_name = st.selectbox('Select Sender', list(sender_options.keys()))
 selected_sender = sender_options[selected_sender_name]
 
@@ -121,7 +133,9 @@ selected_sender = sender_options[selected_sender_name]
 chat_data = agency_data[agency_data['provider_sender_id'] == selected_sender]
 
 # Add toggle for showing all messages
-show_all_messages = st.toggle('Show all messages (including internal AI messages)', value=False)
+st.toggle('Show all messages (including internal AI messages and IDs)', 
+          value=st.session_state.show_all_messages,
+          on_change=toggle_callback)
 
 # Display chat messages
 st.markdown("### Chat History")
@@ -129,7 +143,7 @@ for _, row in chat_data.iterrows():
     messages = parse_chat_messages(row['state_data'])
     
     # Filter messages if not showing all
-    if not show_all_messages:
+    if not st.session_state.get('show_all_messages', False):
         messages = [msg for msg in messages if msg['name'] in ['user_to_main_router', 'formatter_to_user']]
     
     if messages:  # Only show container if there are messages to display
@@ -141,7 +155,7 @@ for _, row in chat_data.iterrows():
             for msg in messages:
                 name_html = (
                     f"<div style='font-size: 0.85em; color: #888; margin-bottom: 3px;'><strong>Name:</strong> {msg['name']}</div>"
-                    if show_all_messages else ""
+                    if st.session_state.get('show_all_messages', False) else ""
                 )
                 if msg['type'] == 'human':
                     st.markdown(
