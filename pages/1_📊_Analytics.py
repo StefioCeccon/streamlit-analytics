@@ -88,19 +88,6 @@ st.markdown("""
 
 ## set up db
 
-# Create connection string
-connection_string = os.environ.get("LOGGER_URL_STRING")
-
-# Comment out database connection
-# @st.cache_resource
-# def get_connection():
-#     logger.info("Creating connection")
-#     return create_engine(connection_string)
-
-# # Connect to database
-# conn = get_connection()
-# logger.info(conn)
-
 # Generate mock data instead of fetching from database
 def generate_mock_data():
     logger.info("Generating mock data")
@@ -118,7 +105,7 @@ def generate_mock_data():
               "Booking_Confirmed", "Itinerary_Request", "Support_Query", "Feedback"]
     
     # Create flavors (keep original column name for compatibility)
-    flavors = ["Instagram", "Website", "Mobile_App"]
+    flavors = ["Instagram", "Whatsapp"]
     
     # Create OS versions (repurposed for user demographics)
     age_groups = ["18-24", "25-34", "35-44", "45-54", "55+"]
@@ -136,7 +123,7 @@ def generate_mock_data():
         date = np.random.choice(dates)
         user_id = np.random.choice(user_ids)
         event = np.random.choice(events)
-        flavor = np.random.choice(flavors, p=[0.7, 0.2, 0.1])  # Instagram is more common
+        flavor = np.random.choice(flavors, p=[0.7, 0.2])  # Instagram is more common
         
         # Repurpose OS and OSVersion for user demographics
         os = "Instagram Bot"

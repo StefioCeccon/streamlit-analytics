@@ -133,7 +133,7 @@ selected_sender = sender_options[selected_sender_name]
 chat_data = agency_data[agency_data['provider_sender_id'] == selected_sender]
 
 # Add toggle for showing all messages
-st.toggle('Debug mode (show all messages and IDs)', 
+st.toggle('Debug mode (show internal messages and IDs)', 
           value=st.session_state.show_all_messages,
           on_change=toggle_callback)
 
