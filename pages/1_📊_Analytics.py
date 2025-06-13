@@ -123,7 +123,7 @@ def generate_mock_data():
         date = np.random.choice(dates)
         user_id = np.random.choice(user_ids)
         event = np.random.choice(events)
-        flavor = np.random.choice(flavors, p=[0.7, 0.2])  # Instagram is more common
+        flavor = np.random.choice(flavors, p=[0.7, 0.3])  # Instagram is more common
         
         # Repurpose OS and OSVersion for user demographics
         os = "Instagram Bot"
